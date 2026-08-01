@@ -6,6 +6,7 @@
   default  on
   node     &oplus_cpa
   set      oplus,protocol_list = <0x04 0x96 0x03 0x78 0x02 0x55 0x01 0x24 0x05 0x24>
+  verify   oplus,protocol_list == <0x04 0x96 0x03 0x78 0x02 0x55 0x01 0x24 0x05 0x24>
   node     &oplus_ufcs_charge
   set      oplus,curr_max_ma = <14600>
   set      oplus,ufcs_strategy_normal_current = <14600>
@@ -217,7 +218,6 @@
   set      pps_charge_oplus_strategy/strategy_soc_range_high : strategy_temp_warm = <0x2af8 0x11da 0x3e8 0x01 0x00>
   node     &oplus_ufcs_virtual_cp
   set      oplus,input_curr_max_ma = <0x3584>
-  verify   oplus,protocol_list == <0x04 0x96 0x03 0x78 0x02 0x55 0x01 0x24 0x05 0x24>
 
 [batt_therm]
   title    温度墙抬高到 48/53 摄氏度
@@ -226,6 +226,7 @@
   warn     抬高温度墙会显著增加发热与电池风险，需配合温度伪装才会走到 53 度档
   node     &oplus_ufcs_charge
   set      oplus,ufcs_strategy_batt_high_temp = <530 530 530 530 530 530>
+  verify   oplus,ufcs_strategy_batt_high_temp == <530 530 530 530 530 530>
   set      oplus,ufcs_charge_strategy_temp = <0 50 120 160 400 480 530>
   set      ufcs_charge_third_strategy : oplus,temp_range = <0 50 120 160 210 400 480 530>
   set      ufcs_charge_oplus_strategy : oplus,temp_range = <0 50 120 160 210 400 480 530>
@@ -244,7 +245,6 @@
   set      oplus_spec,vooc_normal_high_temp = <480>
   set      oplus_spec,vooc_high_temp = <510>
   set      oplus_spec,vooc_over_high_temp = <530>
-  verify   oplus,ufcs_strategy_batt_high_temp == <530 530 530 530 530 530>
 
 [soc_smooth]
   title    显示真实电量

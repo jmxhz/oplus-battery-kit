@@ -824,6 +824,27 @@ int prof_verify_section(rule_sec *sec, dtbo_t *d, buf_t *log)
     return bad ? -1 : 0;
 }
 
+/* each 的生效检查：对通配命中的每个节点，比对同名通配属性是否已是规则值 */
+typedef struct { rule_op *op; varmap *vars; int *checked; int *good; } chkctx;
+
+static void each_check_cb(fdt_node *n, void *ud)
+{
+    chkctx *c = ud;
+    buf_t want;
+    if (eval_value(c->op->value, c->vars, &want) != 0) return;
+    int any = 0, ok = 1;
+    for (fdt_prop *p = n->props; p; p = p->next) {
+        if (!glob_match(c->op->name, p->name)) continue;
+        any = 1;
+        if (p->len != want.len || memcmp(p->data, want.data, want.len) != 0) ok = 0;
+    }
+    if (any) { (*c->checked)++; if (ok) (*c->good)++; }
+    buf_free(&want);
+}
+
+/* 生效判定按「段里每一条 set/each/rm 是否都已是目标状态」来算。
+   不能只看 verify：那一条是规则生成时挑的见证属性，可能本来就等于原厂值
+   （于是原厂也报生效），也可能整段压根没有 verify（于是永远报未生效）。 */
 int prof_section_active(rule_sec *sec, dtbo_t *d)
 {
     int checked = 0, good = 0;
@@ -833,27 +854,25 @@ int prof_section_active(rule_sec *sec, dtbo_t *d)
             if (resolve_target(d, i, t, &sc) != 0) continue;
             varmap vars; memset(&vars, 0, sizeof(vars));
             for (rule_op *o = t->ops; o; o = o->next) {
-                if (o->kind == OP_READ) {
+                switch (o->kind) {
+                case OP_READ: {
                     fdt_node *n = fdt_walk(sc.node, o->node_rel);
                     fdt_prop *p = n ? fdt_getprop(n, o->name) : NULL;
                     if (p && p->len >= 4) vars_set(&vars, o->var, rd_be32(p->data));
-                } else if (o->kind == OP_VERIFY) {
+                    break;
+                }
+                case OP_SET:
+                case OP_VERIFY:
                     checked++;
                     if (verify_one(&sc, o, &vars)) good++;
+                    break;
+                case OP_EACH: {
+                    chkctx c = { o, &vars, &checked, &good };
+                    fdt_walk_glob(sc.node, o->node_rel, each_check_cb, &c);
+                    break;
                 }
-            }
-            vars_free(&vars);
-        }
-    }
-    if (!checked) {
-        /* 无断言的段（例如纯 rm），用「目标节点是否已消失」判断 */
-        for (rule_target *t = sec->targets; t; t = t->next) {
-            for (int i = 0; i < d->n; i++) {
-                scope sc;
-                if (resolve_target(d, i, t, &sc) != 0) continue;
-                for (rule_op *o = t->ops; o; o = o->next) {
-                    if (o->kind != OP_RM && o->kind != OP_RM_OPT) continue;
-                    checked++;
+                case OP_RM:
+                case OP_RM_OPT: {
                     char rel[512]; const char *leaf; char **parts; int nn;
                     split_leaf(o->name, rel, sizeof(rel), &leaf, &parts, &nn);
                     fdt_node *bases[64]; int nb = 0;
@@ -864,10 +883,14 @@ int prof_section_active(rule_sec *sec, dtbo_t *d)
                     for (int bi = 0; bi < nb; bi++)
                         for (fdt_node *ch = bases[bi]->children; ch; ch = ch->next)
                             if (glob_match(leaf, ch->name)) present = 1;
+                    checked++;
                     if (!present) good++;
                     str_split_free(parts, nn);
+                    break;
+                }
                 }
             }
+            vars_free(&vars);
         }
     }
     return checked > 0 && good == checked;
