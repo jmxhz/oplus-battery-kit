@@ -1,0 +1,105 @@
+#!/sbin/sh
+# ============================================================================
+#  obk-restore - 把内置存储里的原厂 dtbo 备份写回分区
+#
+#  自包含，不依赖任何管理器。可在第三方 recovery 中直接刷入。
+#  备份由主模块安装时导出到 /sdcard/obk_backup/。
+# ============================================================================
+
+OUTFD=$2
+ui_print() { echo "ui_print $1" > /proc/self/fd/$OUTFD; echo "ui_print" > /proc/self/fd/$OUTFD; }
+bar()      { ui_print "-------------------------------------------------"; }
+fail()     { ui_print " "; ui_print "  $1"; ui_print "  未写入任何内容"; ui_print " "; exit 1; }
+
+ui_print " "
+ui_print "  obk-restore"
+ui_print "  回刷原厂 dtbo 备份"
+ui_print "  https://github.com/SkyBlue997/oplus-battery-kit"
+ui_print "  本模块免费开源"
+bar
+
+# ---- 挂载 ----
+mount /data 2>/dev/null
+mount /sdcard 2>/dev/null
+
+DIRS="/sdcard/obk_backup /data/media/0/obk_backup /storage/emulated/0/obk_backup"
+BDIR=""
+for d in $DIRS; do
+    [ -d "$d" ] && BDIR="$d" && break
+done
+[ -n "$BDIR" ] || fail "找不到备份目录 obk_backup"
+ui_print "  备份目录: $BDIR"
+
+# ---- 分区 ----
+SLOT=$(getprop ro.boot.slot_suffix 2>/dev/null)
+[ -n "$SLOT" ] || SLOT=$(grep -o 'androidboot.slot_suffix=[^ ]*' /proc/cmdline 2>/dev/null | cut -d= -f2)
+PART="/dev/block/bootdevice/by-name/dtbo${SLOT}"
+[ -e "$PART" ] || PART="/dev/block/by-name/dtbo${SLOT}"
+[ -e "$PART" ] || fail "找不到 dtbo 分区"
+ui_print "  目标分区: $PART"
+
+PSIZE=$(blockdev --getsize64 "$PART" 2>/dev/null)
+[ -n "$PSIZE" ] || PSIZE=0
+
+# ---- 选备份：优先匹配当前系统指纹，其次挑最新 ----
+FP=$(getprop ro.build.fingerprint 2>/dev/null)
+TAG=$(echo "$FP" | tr -c 'A-Za-z0-9' '_' | cut -c1-40)
+
+IMG=""
+if [ -n "$TAG" ]; then
+    for f in "$BDIR"/dtbo_*_"$TAG".img; do
+        [ -f "$f" ] && IMG="$f" && break
+    done
+fi
+if [ -z "$IMG" ]; then
+    for f in "$BDIR"/dtbo_*.img; do
+        [ -f "$f" ] && IMG="$f"
+    done
+    if [ -n "$IMG" ]; then
+        ui_print "  未找到与当前系统版本匹配的备份"
+        ui_print "  将使用目录里最后一份，请自行确认版本是否对应"
+    fi
+fi
+[ -n "$IMG" ] || fail "备份目录里没有 dtbo 镜像"
+ui_print "  备份文件: $(basename "$IMG")"
+
+# ---- 校验 ----
+SZ=$(wc -c < "$IMG" 2>/dev/null | tr -d ' ')
+ui_print "  大小: $SZ 字节 (分区 $PSIZE)"
+[ "$SZ" -gt 0 ] || fail "备份文件为空"
+if [ "$PSIZE" -gt 0 ] && [ "$SZ" -gt "$PSIZE" ]; then
+    fail "备份比分区大，拒绝写入"
+fi
+
+if [ -f "$IMG.md5" ]; then
+    WANT=$(cat "$IMG.md5" | tr -d ' \n')
+    HAVE=$(md5sum "$IMG" | awk '{print $1}')
+    if [ "$WANT" != "$HAVE" ]; then
+        fail "备份文件 MD5 不符，可能已损坏"
+    fi
+    ui_print "  MD5 校验通过"
+fi
+
+bar
+ui_print "  正在写入，请勿关机"
+dd if="$IMG" of="$PART" 2>/dev/null || fail "写入失败"
+sync
+
+# ---- 回读比对 ----
+# 按块读再截断，避免 bs=1 造成的逐字节系统调用（分区级数据会慢到分钟量级）
+BACK=$(dd if="$PART" bs=65536 2>/dev/null | head -c "$SZ" | md5sum | awk '{print $1}')
+SRC=$(md5sum "$IMG" | awk '{print $1}')
+if [ "$BACK" != "$SRC" ]; then
+    ui_print "  回读比对不一致，请重试或用 fastboot 回刷"
+    exit 1
+fi
+
+# 清掉主模块记录的分区指纹，避免开机自检误报
+rm -f /data/obk/dtbo.md5 2>/dev/null
+
+bar
+ui_print " "
+ui_print "  已还原原厂 dtbo"
+ui_print "  重启即可"
+ui_print " "
+exit 0

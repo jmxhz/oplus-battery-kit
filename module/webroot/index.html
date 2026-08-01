@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>oplus battery kit</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div id="app">
+  <header class="top">
+    <div class="brand">
+      <h1>oplus <em>battery</em> kit</h1>
+      <p id="subtitle">正在读取</p>
+    </div>
+    <button id="refresh" class="ghost" type="button">刷新</button>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab is-on" data-view="monitor" type="button">监控</button>
+    <button class="tab" data-view="features" type="button">功能</button>
+    <button class="tab" data-view="charge" type="button">恒压</button>
+    <button class="tab" data-view="system" type="button">系统</button>
+    <button class="tab" data-view="about" type="button">关于</button>
+  </nav>
+
+  <main>
+    <!-- ------------------------------------------------ 监控 -->
+    <section id="view-monitor" class="view is-on">
+      <div class="banner" id="banner" hidden></div>
+
+      <div class="gauge">
+        <div class="gauge-top">
+          <span class="gauge-num" id="m-soc">--</span>
+          <span class="gauge-pct">%</span>
+          <span class="gauge-meta"><b id="m-status">--</b><span id="m-sub">--</span></span>
+        </div>
+        <div class="scale">
+          <svg id="scale" viewBox="0 0 600 26" preserveAspectRatio="none" aria-hidden="true"></svg>
+        </div>
+      </div>
+
+      <div class="grid" id="metrics"></div>
+
+      <div class="card">
+        <div class="card-hd">
+          <h2>实时曲线</h2>
+          <div class="seg" id="chart-pick">
+            <button class="on" data-k="power" type="button">功率</button>
+            <button data-k="current" type="button">电流</button>
+            <button data-k="voltage" type="button">电压</button>
+            <button data-k="temp" type="button">温度</button>
+          </div>
+        </div>
+        <div class="chart-box"><svg id="chart" viewBox="0 0 640 220" preserveAspectRatio="none"></svg></div>
+        <p class="hint" id="chart-hint">采样每 2 秒一次，仅保留最近 150 点</p>
+      </div>
+
+      <div class="card">
+        <h2>电池信息</h2>
+        <dl class="kv" id="battinfo"></dl>
+      </div>
+    </section>
+
+    <!-- ------------------------------------------------ 功能 -->
+    <section id="view-features" class="view">
+      <div class="card">
+        <div class="card-hd">
+          <h2>DTBO 功能</h2>
+          <span class="tag">改动后需重启</span>
+        </div>
+        <div id="dtbo-list" class="switch-list"></div>
+        <div class="apply-bar">
+          <span id="dirty-hint">没有待应用的改动</span>
+          <button id="apply" class="primary" type="button" disabled>应用并重启</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-hd">
+          <h2>运行时</h2>
+          <span class="tag ok">即时生效</span>
+        </div>
+        <div id="rt-list" class="switch-list"></div>
+      </div>
+    </section>
+
+    <!-- ------------------------------------------------ 恒压 -->
+    <section id="view-charge" class="view">
+      <div class="card">
+        <h2>恒压涓流参数</h2>
+        <p class="hint">
+          这些值直接决定充电末段的电流控制。调整前请确认自己了解每一项的含义，
+          并按实际设备核实取值。
+        </p>
+        <div id="cv-form" class="form"></div>
+        <div class="apply-bar">
+          <button id="cv-reset" class="ghost" type="button">恢复默认</button>
+          <button id="cv-save" class="primary" type="button">保存</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>守护日志</h2>
+        <pre id="cv-log" class="log">未启用</pre>
+      </div>
+    </section>
+
+    <!-- ------------------------------------------------ 系统 -->
+    <section id="view-system" class="view">
+      <div class="card">
+        <h2>引导与校验</h2>
+        <dl class="kv" id="detect"></dl>
+      </div>
+      <div class="card">
+        <h2>原厂快照</h2>
+        <dl class="kv" id="snap"></dl>
+        <div class="apply-bar">
+          <button id="revert" class="danger" type="button">全部还原为原厂</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>运行日志</h2>
+        <pre id="syslog" class="log">--</pre>
+      </div>
+
+</section>
+    <!-- ------------------------------------------------ 关于 -->
+    <section id="view-about" class="view">
+      <div class="card">
+        <h2>项目</h2>
+        <dl class="kv">
+          <dt>名称</dt><dd>oplus battery kit</dd>
+          <dt>版本</dt><dd id="about-ver">--</dd>
+          <dt>许可</dt><dd>免费开源</dd>
+        </dl>
+        <div class="repo">
+          <span class="repo-url" id="repo-url">https://github.com/SkyBlue997/oplus-battery-kit</span>
+          <button id="repo-copy" class="ghost" type="button">复制地址</button>
+        </div>
+        <p class="hint">
+          本模块完全免费。若你是付费获得的，说明被转卖了，
+          请到上面的地址自行获取。问题反馈与版本更新也以该地址为准。
+        </p>
+      </div>
+
+      <div class="card">
+        <h2>免责声明</h2>
+        <p class="hint">
+          本模块修改电池管理与充电控制行为，与设备制造商无任何关联，
+          未获得其认可或授权。按现状提供，不附带任何担保。
+        </p>
+        <p class="hint">
+          可能导致电池加速衰减、鼓包、损坏乃至起火；充电控制异常、过充或过热；
+          设备无法开机、数据丢失、硬件永久损坏；制造商保修失效。
+          温度与电流相关功能默认关闭，开启与否由你自行决定并承担后果。
+        </p>
+        <p class="hint">
+          在法律允许的最大范围内，作者不对因使用或无法使用本模块而产生的任何
+          直接、间接、偶然、特殊或后果性损害承担责任。
+        </p>
+        <p class="hint">
+          出现异常发热、鼓包或充电行为反常时，立即断开充电器并还原全部改动。
+          安装前导出的原厂备份务必拷到电脑保存。
+        </p>
+        <p class="hint">
+          本模块不联网，不收集也不上传任何信息，无遥测与授权校验。
+          配置、快照与日志仅保存在设备本地 /data/obk 与 /sdcard/obk_backup。
+        </p>
+        <p class="hint">完整条款见项目仓库的 README 免责声明一节。</p>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" hidden></div>
+  <div id="modal" class="modal" hidden>
+    <div class="modal-box">
+      <h3 id="modal-title">确认</h3>
+      <p id="modal-body"></p>
+      <div class="modal-act">
+        <button id="modal-no" class="ghost" type="button">取消</button>
+        <button id="modal-yes" class="danger" type="button">确定</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

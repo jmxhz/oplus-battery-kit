@@ -1,0 +1,24 @@
+#!/sbin/sh
+# Magisk / KernelSU / APatch 通用模块安装引导
+
+umask 022
+ui_print() { echo "$1"; }
+
+need_newer() {
+  ui_print "***********************************"
+  ui_print " 请升级到 Magisk 20.4 或更高版本  "
+  ui_print "***********************************"
+  exit 1
+}
+
+OUTFD=$2
+ZIPFILE=$3
+
+mount /data 2>/dev/null
+
+[ -f /data/adb/magisk/util_functions.sh ] || need_newer
+. /data/adb/magisk/util_functions.sh
+[ "$MAGISK_VER_CODE" -lt 20400 ] && need_newer
+
+install_module
+exit 0

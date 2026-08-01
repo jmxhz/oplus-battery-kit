@@ -1,0 +1,319 @@
+/* oplus battery kit - 纸面排印风格
+ * 米色纸底 + 布纹肌理，等宽小字负字距，衬线大字做数据，细线分隔取代卡片阴影。
+ * 全部离线：字体走系统栈，肌理用内联 SVG 噪声，无任何外部请求。
+ */
+
+:root{
+  --paper:   #e8dfd0;
+  --paper-2: #e0d6c4;
+  --paper-3: #d6cab4;
+  --ink:     #3a2d2a;
+  --ink-2:   #58423c;
+  --ink-3:   #8d7c6e;
+  --rule:    #c6b8a2;
+  --rule-2:  #d5c9b5;
+  --seal:    #a63d2e;
+  --jade:    #5c6b4a;
+  --amber:   #96702a;
+
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", "DejaVu Sans Mono",
+          Menlo, Consolas, "Noto Sans Mono CJK SC", monospace;
+  --serif: "PP Eiko", "Times New Roman", Times, "Songti SC", "SimSun",
+           "Noto Serif CJK SC", "Source Han Serif SC", serif;
+}
+
+@media (prefers-color-scheme: dark){
+  :root{
+    --paper:   #211c18;
+    --paper-2: #272119;
+    --paper-3: #2f271e;
+    --ink:     #ece2d2;
+    --ink-2:   #cbbca8;
+    --ink-3:   #8d7f6e;
+    --rule:    #453a2d;
+    --rule-2:  #372e24;
+    --seal:    #c1614f;
+    --jade:    #8fa172;
+    --amber:   #c39a45;
+  }
+}
+
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+
+body{
+  background-color:var(--paper);
+  color:var(--ink-2);
+  font:400 13px/1.7 var(--mono);
+  letter-spacing:-.03em;
+  padding:0 0 env(safe-area-inset-bottom);
+  position:relative;
+}
+/* 纸纹：细噪声 + 极淡的经纬织纹 */
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E"),
+    repeating-linear-gradient(90deg, rgba(120,95,70,.05) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(0deg,  rgba(120,95,70,.05) 0 1px, transparent 1px 3px);
+  opacity:.5;
+  mix-blend-mode:multiply;
+}
+@media (prefers-color-scheme: dark){
+  body::before{mix-blend-mode:screen;opacity:.28}
+}
+
+#app{max-width:720px;margin:0 auto;padding:26px 20px 56px;position:relative;z-index:1}
+
+/* ------------------------------------------------------------- 页眉 --- */
+.top{
+  display:flex;align-items:flex-start;justify-content:space-between;
+  gap:16px;padding-bottom:14px;border-bottom:1px solid var(--rule);
+}
+.top .ghost{margin-top:3px;flex:0 0 auto}
+.brand{min-width:0}
+.brand h1{
+  font:500 30px/.95 var(--serif);
+  letter-spacing:-.035em;color:var(--ink);margin:0;
+}
+.brand h1 em{font-style:normal;color:var(--ink-3)}
+.brand p{
+  margin:7px 0 0;font-size:11.5px;color:var(--ink-3);
+  text-transform:uppercase;letter-spacing:.02em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+
+/* ------------------------------------------------------------ 标签页 -- */
+.tabs{display:flex;gap:20px;margin:16px 0 22px;flex-wrap:wrap}
+.tab{
+  border:0;background:none;padding:2px 0 5px;cursor:pointer;
+  font:500 13px var(--mono);letter-spacing:-.03em;
+  color:var(--ink-3);border-bottom:1.5px solid transparent;
+}
+.tab.is-on{color:var(--ink);border-bottom-color:var(--ink)}
+.view{display:none}
+.view.is-on{display:block}
+
+/* -------------------------------------------------------------- 分区 -- */
+.card{
+  border-top:1px solid var(--rule);
+  padding:18px 0 20px;margin:0;
+}
+.card:first-of-type{border-top:0;padding-top:4px}
+.card h2{
+  font:500 11px var(--mono);letter-spacing:.1em;text-transform:uppercase;
+  color:var(--ink-3);margin:0 0 14px;
+}
+.card-hd{
+  display:flex;align-items:baseline;justify-content:space-between;
+  gap:12px;margin-bottom:14px;flex-wrap:wrap;
+}
+.card-hd h2{margin:0}
+.hint{font-size:11.5px;color:var(--ink-3);margin:10px 0 0;line-height:1.75}
+
+/* 邮票式细框标签 */
+.tag{
+  font-size:10px;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--ink-3);border:1px solid var(--rule);
+  padding:2px 7px;white-space:nowrap;
+}
+.tag.ok{color:var(--jade);border-color:var(--jade)}
+
+/* ------------------------------------------------------- 电量与标尺 -- */
+.gauge{margin:6px 0 26px}
+.gauge-top{display:flex;align-items:flex-end;gap:12px;margin-bottom:12px}
+.gauge-num{
+  font:500 76px/.82 var(--serif);letter-spacing:-.05em;color:var(--ink);
+  font-variant-numeric:tabular-nums;
+}
+.gauge-pct{font:500 20px/1 var(--serif);color:var(--ink-3);margin-bottom:6px}
+.gauge-meta{
+  margin-left:auto;text-align:right;font-size:11.5px;color:var(--ink-3);
+  line-height:1.55;padding-bottom:4px;
+}
+.gauge-meta b{display:block;color:var(--ink-2);font-weight:500}
+.scale{position:relative;height:26px}
+.scale svg{width:100%;height:100%;display:block;overflow:visible}
+.scale .tick{stroke:var(--rule);stroke-width:1}
+.scale .tick.major{stroke:var(--ink-3)}
+.scale .fill{stroke:var(--ink);stroke-width:2.5}
+.scale .base{stroke:var(--rule);stroke-width:1}
+
+/* -------------------------------------------------------- 指标表格 --- */
+.grid{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(84px,1fr));
+  column-gap:2px;row-gap:16px;margin:0;
+}
+.cell{padding:0 8px 0 0}
+.cell u{
+  display:block;text-decoration:none;font-size:10px;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--ink-3);margin-bottom:3px;
+}
+.cell b{
+  display:block;font:500 22px/1.05 var(--serif);color:var(--ink);
+  font-variant-numeric:tabular-nums;letter-spacing:-.03em;
+}
+.cell i{font-style:normal;font:400 10px var(--mono);color:var(--ink-3);margin-left:2px}
+
+/* ---------------------------------------------------------- 图表 ----- */
+.seg{display:flex;gap:14px}
+.seg button{
+  border:0;background:none;padding:0 0 3px;cursor:pointer;
+  font:400 11px var(--mono);letter-spacing:-.02em;color:var(--ink-3);
+  border-bottom:1px solid transparent;
+}
+.seg button.on{color:var(--ink);border-bottom-color:var(--ink)}
+.chart-box{width:100%;height:176px;margin-top:2px}
+#chart{width:100%;height:100%;overflow:visible}
+#chart .axis{stroke:var(--rule-2);stroke-width:1;stroke-dasharray:2 3}
+#chart .lbl{fill:var(--ink-3);font:400 9.5px var(--mono);letter-spacing:0}
+#chart .line{fill:none;stroke:var(--ink);stroke-width:1.4;
+  stroke-linejoin:round;stroke-linecap:round}
+#chart .area{fill:var(--ink);opacity:.045}
+#chart .dot{fill:var(--seal)}
+
+/* ------------------------------------------------------- 键值列表 --- */
+.kv{margin:0;display:grid;grid-template-columns:auto 1fr;gap:0 16px}
+.kv dt{
+  font-size:11.5px;color:var(--ink-3);white-space:nowrap;
+  padding:5px 0;border-bottom:1px dotted var(--rule-2);
+}
+.kv dd{
+  margin:0;font-size:12px;text-align:right;color:var(--ink-2);
+  font-variant-numeric:tabular-nums;word-break:break-all;
+  padding:5px 0;border-bottom:1px dotted var(--rule-2);
+}
+.kv dt:last-of-type,.kv dd:last-of-type{border-bottom:0}
+
+/* ------------------------------------------------------- 开关行 ----- */
+.switch-list{display:flex;flex-direction:column}
+.row{
+  display:flex;align-items:flex-start;gap:14px;
+  padding:13px 0;border-top:1px dotted var(--rule-2);
+}
+.row:first-child{border-top:0;padding-top:2px}
+.row-main{flex:1;min-width:0}
+.row-title{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.row-title strong{
+  font:500 15px/1.35 var(--serif);letter-spacing:-.02em;color:var(--ink);
+}
+.row-desc{font-size:11.5px;color:var(--ink-3);margin-top:4px;line-height:1.7}
+.row-warn{
+  font-size:11.5px;color:var(--amber);margin-top:5px;line-height:1.7;
+  padding-left:10px;border-left:1.5px solid var(--amber);
+}
+.pill{
+  font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;
+  padding:1px 6px;border:1px solid var(--rule);color:var(--ink-3);white-space:nowrap;
+}
+.pill.live{color:var(--jade);border-color:var(--jade)}
+.pill.lock{color:var(--ink-3)}
+.pill.chg{color:var(--seal);border-color:var(--seal)}
+
+/* 方框式开关：空框 / 实心方块，取自纸质表单的勾选栏 */
+.sw{
+  position:relative;width:34px;height:20px;flex:0 0 auto;padding:0;margin-top:2px;
+  background:none;border:1px solid var(--ink-3);cursor:pointer;
+  transition:border-color .15s;
+}
+.sw::after{
+  content:"";position:absolute;top:3px;left:3px;width:12px;height:12px;
+  background:var(--ink-3);opacity:.22;transition:transform .18s,opacity .18s,background .18s;
+}
+.sw[aria-checked="true"]{border-color:var(--ink)}
+.sw[aria-checked="true"]::after{transform:translateX(14px);opacity:1;background:var(--ink)}
+.sw[disabled]{opacity:.45;cursor:not-allowed}
+
+/* ---------------------------------------------------------- 表单 ---- */
+.form{display:grid;grid-template-columns:1fr auto;gap:0 14px;align-items:stretch}
+.form label{
+  font-size:11.5px;color:var(--ink-2);padding:9px 0;
+  border-bottom:1px dotted var(--rule-2);
+  display:flex;flex-direction:column;justify-content:center;
+}
+.form label em{
+  display:block;font-style:normal;font-size:9.5px;color:var(--ink-3);
+  letter-spacing:.02em;margin-top:1px;
+}
+.form input{
+  width:104px;background:none;border:0;
+  border-bottom:1px dotted var(--rule-2);   /* 与标签侧同一条点线 */
+  color:var(--ink);border-radius:0;padding:9px 2px;
+  font:500 13px var(--mono);letter-spacing:-.02em;
+  text-align:right;font-variant-numeric:tabular-nums;
+  align-self:stretch;
+}
+.form input:focus{
+  outline:0;border-bottom:1px solid var(--ink);
+  background:linear-gradient(var(--paper-2),var(--paper-2));
+}
+
+/* ---------------------------------------------------------- 按钮 ---- */
+button{font-family:var(--mono)}
+.primary,.ghost,.danger{
+  font:500 12px var(--mono);letter-spacing:-.02em;cursor:pointer;
+  padding:8px 18px;border-radius:999px;border:1px solid transparent;
+}
+.primary{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.primary[disabled]{
+  background:none;color:var(--ink-3);border-color:var(--rule);
+  cursor:not-allowed;
+}
+.ghost{background:none;color:var(--ink-2);border-color:var(--rule)}
+.danger{background:var(--seal);color:var(--paper);border-color:var(--seal)}
+.apply-bar{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:14px;margin-top:16px;padding-top:14px;
+  border-top:1px solid var(--rule);flex-wrap:wrap;
+}
+.apply-bar span{font-size:11px;color:var(--ink-3)}
+
+/* -------------------------------------------------------- 关于 ----- */
+.repo{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:12px;margin-top:16px;padding:11px 13px;
+  border:1px solid var(--rule);background:var(--paper-2);flex-wrap:wrap;
+}
+.repo-url{
+  font:400 11px/1.6 var(--mono);letter-spacing:-.03em;color:var(--ink);
+  /* 长链接优先在斜杠与连字符处断行，避免把单词从中间劈开 */
+  overflow-wrap:break-word;word-break:normal;
+  user-select:all;-webkit-user-select:all;flex:1 1 200px;
+}
+
+/* -------------------------------------------------------- 提示条 ---- */
+.banner{
+  padding:11px 0 11px 13px;font-size:12px;margin-bottom:20px;
+  line-height:1.7;border-left:2px solid;
+}
+.banner.ok  {color:var(--jade); border-color:var(--jade)}
+.banner.warn{color:var(--amber);border-color:var(--amber)}
+.banner.bad {color:var(--seal); border-color:var(--seal)}
+.modal[hidden],.toast[hidden],.banner[hidden],[hidden]{display:none}
+
+.log{
+  background:var(--paper-2);border:1px solid var(--rule-2);
+  padding:11px 12px;font:400 10.5px/1.75 var(--mono);letter-spacing:-.01em;
+  max-height:280px;overflow:auto;margin:0;
+  white-space:pre-wrap;word-break:break-all;color:var(--ink-3);
+}
+
+.toast{
+  position:fixed;left:50%;bottom:26px;transform:translateX(-50%);
+  background:var(--ink);border:1px solid var(--ink);color:var(--paper);
+  padding:9px 18px;border-radius:999px;font-size:11.5px;z-index:60;
+  max-width:88vw;text-align:center;
+}
+
+.modal{
+  position:fixed;inset:0;background:rgba(35,27,22,.55);z-index:70;
+  display:flex;align-items:center;justify-content:center;padding:22px;
+}
+.modal-box{
+  background:var(--paper);border:1px solid var(--ink);
+  padding:22px;max-width:400px;width:100%;
+  box-shadow:5px 5px 0 rgba(58,45,42,.14);
+}
+.modal-box h3{font:500 20px/1.2 var(--serif);letter-spacing:-.03em;color:var(--ink);margin:0 0 10px}
+.modal-box p{margin:0 0 18px;font-size:12px;color:var(--ink-2);line-height:1.75}
+.modal-act{display:flex;gap:10px;justify-content:flex-end}

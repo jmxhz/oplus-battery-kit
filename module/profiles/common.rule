@@ -1,0 +1,114 @@
+# 全机型通用规则
+#
+# 语法要点：
+#   [id]            段；[!id] 表示强制段，不进菜单、不可关
+#   node   &label   经 __symbols__ 解析标签，作为后续操作的作用域
+#   prefer glob     若存在匹配的子节点，改以该子节点为作用域
+#   fixup  prop     改从 __fixups__ 的该属性取目标，配合 match 使用
+#   read   $v = p   现场读取属性首个 cell 到变量
+#   set    [路径 :] 属性 = 值      冒号左为子节点路径，右为属性名
+#   each   [路径 :] 属性通配 = 值  仅改写已存在的属性
+#   rm  / rm?       删除子节点，rm? 表示不存在则跳过
+#   verify 属性 == 值               写入前的读回断言
+#   值：<数组> 十进制或 0x 十六进制；"字符串"；! 表示空属性
+
+# ---------------------------------------------------------------- 强制段
+
+[!rm_lcf]
+  title    移除 LCF 充电结束策略
+  desc     内核不再自行判满，把充满的最后一程交给恒压涓流守护
+  suggest  cv_daemon
+  warn     移除后若未启用恒压守护，充满后可能仍有小电流
+  node     &oplus_ufcs_charge
+  rm?      ufcs_oplus_lcf_strategy
+  rm?      ufcs_third_lcf_strategy
+  rm?      ufcs_oplus_lcf_strategy_1
+  rm?      ufcs_third_lcf_strategy_1
+  rm?      */ufcs_oplus_lcf_strategy
+  rm?      */ufcs_third_lcf_strategy
+  node     &oplus_pps_charge
+  rm?      pps_oplus_lcf_strategy
+  rm?      pps_third_lcf_strategy
+  rm?      pps_oplus_lcf_strategy_1
+  rm?      pps_third_lcf_strategy_1
+  rm?      */pps_oplus_lcf_strategy
+  rm?      */pps_third_lcf_strategy
+
+# ------------------------------------------------------------ dtbo 功能
+
+[ddrc]
+  title    解除深放降容
+  desc     深放计数不再累积，放电截止电压固定在地板值，不再按截止电压修正 FCC
+  default  on
+  warn     电池被允许放到更低电压，长期如此会加速容量衰减
+  node     &oplus_mms_gauge
+  prefer   silicon_p_*
+  read     $uv = deep_spec,uv_thr
+  set      deep_spec,count_thr  = <0>
+  set      deep_spec,vbat_soc   = <0>
+  set      deep_spec,count_step = <0 0 0>
+  set      deep_spec,term_coeff = <0 0 0>
+  each     ddrc_strategy/strategy_ratio_range_* : strategy_temp_* = <0 $uv $uv 0>
+  verify   deep_spec,count_step == <0 0 0>
+  verify   deep_spec,term_coeff == <0 0 0>
+
+[hm_gki]
+  title    非官方内核调度模式
+  desc     把调度器版本标记改为 GKI，供非官方内核使用
+  default  auto:kernel_gki
+  devices  PJZ110 PKR110 PLQ110 RMX5010
+  warn     内核类型选错会导致无限重启，官方内核请保持关闭
+  fixup    soc
+  match    oplus,hmbird
+  set      oplus,hmbird/version_type : type = "HMBIRD_GKI"
+  verify   oplus,hmbird/version_type : type == "HMBIRD_GKI"
+
+# -------------------------------------------------------------- 运行时
+
+[proto_pps]
+  title    PPS 协议
+  kind     runtime
+  default  on
+  reboot   no
+  handler  proto
+
+[proto_ufcs]
+  title    UFCS 协议
+  kind     runtime
+  default  on
+  reboot   no
+  handler  proto
+
+[proto_svooc]
+  title    SVOOC 协议
+  kind     runtime
+  default  on
+  reboot   no
+  handler  proto
+
+[fake_temp]
+  title    电池温度伪装
+  desc     向温度上报节点写入固定值并锁死权限
+  kind     runtime
+  default  off
+  reboot   no
+  handler  faketemp
+  warn     温度墙的高温档需要此项配合才会走到
+
+[lock_votes]
+  title    锁定充电电流投票
+  desc     写入目标电流并回收节点写权限，防止系统改回
+  kind     runtime
+  default  on
+  reboot   no
+  handler  lockvotes
+
+[cv_daemon]
+  title    恒压涓流守护
+  desc     接管充电末段，按恒压目标逐步收流直到判满
+  kind     runtime
+  default  off
+  reboot   no
+  handler  daemon
+  suggest  rm_lcf
+  warn     该功能直接控制充电电流，参数需按实际设备核实后再调整

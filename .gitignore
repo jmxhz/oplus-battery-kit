@@ -1,0 +1,16 @@
+# 构建与测试中间产物
+build/
+dist/
+
+# 由 pack.sh 从 dist/obk 拷入，不入库
+module/bin/
+
+# 编译副产物
+*.o
+*.d
+
+# 系统垃圾
+.DS_Store
+
+# 开发与测试工装，不随仓库发布
+tests/
