@@ -37,6 +37,12 @@ else
 fi
 
 # --- 2. 运行时开关 ---------------------------------------------------------
+# 新内核的 votable 协议开关：先激活 force 通道并置为开启(0)
+for d in PPS_DISABLE UFCS_DISABLE VOOC_DISABLE; do
+    [ -e "/proc/oplus-votable/$d/force_active" ] && echo 1 > "/proc/oplus-votable/$d/force_active" 2>/dev/null
+    [ -e "/proc/oplus-votable/$d/force_val" ] && echo 0 > "/proc/oplus-votable/$d/force_val" 2>/dev/null
+done
+
 for p in pps ufcs svooc; do
     v="$(get "proto_$p")"
     [ -z "$v" ] && v=1
