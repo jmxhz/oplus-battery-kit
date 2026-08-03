@@ -13,6 +13,10 @@
 #define PS_BATT    "/sys/class/power_supply/battery"
 #define PS_USB     "/sys/class/power_supply/usb"
 
+/* 新内核 votable 强制接口：判满后真正停充 */
+#define WD_FORCE_VAL  "/proc/oplus-votable/WIRED_CHARGING_DISABLE/force_val"
+#define WD_FORCE_ACT  "/proc/oplus-votable/WIRED_CHARGING_DISABLE/force_active"
+
 /* ------------------------------------------------------------ 小工具 -- */
 
 static long read_long(const char *path, long dflt)
@@ -403,13 +407,41 @@ int batt_daemon(cfg_t *c, node_cand *nodes)
     const char *bcc = OC_BATT "/bcc_current";
     if (!file_exists(bcc)) { err("找不到 %s，守护无法工作", bcc); return EX_ERR; }
 
-    long imax_ufcs = cfg_get_int(c, "cv_ufcs_max_ma", 9100);
-    long imax_pps  = cfg_get_int(c, "cv_pps_max_ma", 5000);
+    /* bcc_current 单位校准：Android 16 新内核按 0.1A/格 解析（写 73=7300mA），
+       旧内核直接按 mA。写测试值后读 votable 反推倍率，保证按 mA 语义写入。 */
+    long bcc_scale = 1;
+    {
+        const char *vs = "/proc/oplus-votable/VOOC_CURR/status";
+        if (file_exists(vs)) {
+            chmod(bcc, 0644);
+            write_long(bcc, 100);
+            chmod(bcc, 0400);
+            buf_t b;
+            if (file_read(vs, &b) == 0) {
+                buf_u8(&b, 0);
+                char *st = (char *)b.data;
+                char *p = strstr(st, "BCC_VOTER");
+                if (p && (p = strstr(p, "v=")))
+                    bcc_scale = atol(p + 2) / 100;
+                buf_free(&b);
+            }
+            if (bcc_scale < 1) bcc_scale = 1;
+            chmod(bcc, 0644);
+            write_long(bcc, 0);
+            chmod(bcc, 0400);
+        }
+    }
+    /* 复位判满停充的强制通道，避免上次异常残留 */
+    write_str(WD_FORCE_VAL, "0");
+    write_str(WD_FORCE_ACT, "0");
+
+    long imax_ufcs = cfg_get_int(c, "cv_ufcs_max_ma", 14600);
+    long imax_pps  = cfg_get_int(c, "cv_pps_max_ma", 6500);
     long inc_step  = cfg_get_int(c, "cv_inc_step_ma", 100);
     long dec_step  = cfg_get_int(c, "cv_dec_step_ma", 100);
     long loop_ms   = cfg_get_int(c, "cv_loop_ms", 2000);
     long cv_vol    = cfg_get_int(c, "cv_vol_mv", 4565);
-    long cv_max    = cfg_get_int(c, "cv_max_ma", 5000);
+    long cv_max    = cfg_get_int(c, "cv_max_ma", 11000);
     long tc_vol    = cfg_get_int(c, "cv_tc_vol_thr_mv", 4500);
     long tc_soc    = cfg_get_int(c, "cv_tc_thr_soc", 98);
     long tc_full   = cfg_get_int(c, "cv_tc_full_ma", 400);
@@ -440,6 +472,7 @@ int batt_daemon(cfg_t *c, node_cand *nodes)
 
         if (s.usb_online != 1) {
             if (st != ST_IDLE) { daemon_log("充电器断开，释放控制"); st = ST_IDLE; }
+            write_str(WD_FORCE_VAL, "0");
             struct timespec ts = { loop_ms / 1000, (loop_ms % 1000) * 1000000L };
             nanosleep(&ts, NULL);
             continue;
@@ -501,7 +534,12 @@ int batt_daemon(cfg_t *c, node_cand *nodes)
 
         case ST_FULL:
             target = 0;
-            if (vbat < tc_vfull - 100 || s.soc < tc_soc - 2) next = ST_TC;
+            write_str(WD_FORCE_VAL, "1");
+            write_str(WD_FORCE_ACT, "1");
+            if (vbat < tc_vfull - 100 || s.soc < tc_soc - 2) {
+                next = ST_TC;
+                write_str(WD_FORCE_VAL, "0");
+            }
             break;
         }
 
@@ -515,7 +553,7 @@ int batt_daemon(cfg_t *c, node_cand *nodes)
 
         if (st != ST_IDLE) {
             chmod(bcc, 0644);
-            write_long(bcc, target);
+            write_long(bcc, target / bcc_scale);
             chmod(bcc, 0400);
         }
 
@@ -524,6 +562,8 @@ int batt_daemon(cfg_t *c, node_cand *nodes)
     }
 
     {
+        write_str(WD_FORCE_VAL, "0");
+        write_str(WD_FORCE_ACT, "0");
         char *pf = daemon_pidfile();
         unlink(pf);
         free(pf);
