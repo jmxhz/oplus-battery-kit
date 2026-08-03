@@ -373,6 +373,18 @@ int batt_daemon_pid(void)
     free(s);
     if (pid <= 0) return 0;
     if (kill(pid, 0) != 0) return 0;      /* 进程已不存在 */
+    /* 防 pid 复用：确认该 pid 确实是 obk 守护，否则视为残留并清掉 */
+    char cmd[64];
+    snprintf(cmd, sizeof(cmd), "/proc/%d/cmdline", pid);
+    char *c = read_line_file(cmd);
+    if (!c || !strstr(c, "obk")) {
+        free(c);
+        char *pf = daemon_pidfile();
+        unlink(pf);
+        free(pf);
+        return 0;
+    }
+    free(c);
     return pid;
 }
 
