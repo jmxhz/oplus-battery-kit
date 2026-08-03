@@ -52,6 +52,14 @@ if [ "$v" = "1" ]; then
     $O batt lockvotes on >/dev/null 2>&1 && log "电流投票已锁定"
 fi
 
+# 解除超级省电模式对关机电压的投票 (2900mV -> 2750mV)
+# PLK110 等新机型上该投票默认激活，会把 vbat_uv 顶回 2900mV，
+# 与 dtbo 中已清零的深放降容表无关，需在开机时单独写回 1。
+SE=/sys/class/oplus_chg/common/super_endurance_mode_status
+if [ -e "$SE" ]; then
+    echo 1 > "$SE" 2>/dev/null && log "超级省电模式截止电压已解除" || log "超级省电模式节点不可写"
+fi
+
 if on fake_temp; then
     $O batt faketemp on >/dev/null 2>&1 && log "温度伪装已开启"
 fi
