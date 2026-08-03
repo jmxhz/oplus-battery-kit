@@ -173,6 +173,35 @@ int batt_faketemp_get(void)
 
 /* --------------------------------------------------- 电流投票锁定 ---- */
 
+/* bcc_current 单位校准：Android 16 新内核按 0.1A/格解析（写 73=7300mA），
+   旧内核直接按 mA。写测试值读 votable 反推倍率（100/50/1），
+   供守护进程与锁电流投票共用。 */
+static long batt_bcc_scale(void)
+{
+    const char *bcc = OC_BATT "/bcc_current";
+    const char *vs = "/proc/oplus-votable/VOOC_CURR/status";
+    long scale = 1;
+    if (file_exists(vs)) {
+        chmod(bcc, 0644);
+        write_long(bcc, 100);
+        chmod(bcc, 0400);
+        buf_t b;
+        if (file_read(vs, &b) == 0) {
+            buf_u8(&b, 0);
+            char *st = (char *)b.data;
+            char *p = strstr(st, "BCC_VOTER");
+            if (p && (p = strstr(p, "v=")))
+                scale = atol(p + 2) / 100;
+            buf_free(&b);
+        }
+        if (scale < 1) scale = 1;
+        chmod(bcc, 0644);
+        write_long(bcc, 0);
+        chmod(bcc, 0400);
+    }
+    return scale;
+}
+
 int batt_lockvotes(int on, int bcc_current)
 {
     const char *bcc = OC_BATT "/bcc_current";
@@ -188,7 +217,9 @@ int batt_lockvotes(int on, int bcc_current)
     chmod(bcc, 0644); chmod(cd, 0644); chmod(ncd, 0644);
     write_long(cd, 0);
     write_long(ncd, 0);
-    write_long(bcc, bcc_current);
+    long scale = batt_bcc_scale();
+    chmod(bcc, 0644);
+    write_long(bcc, bcc_current / scale);
     chmod(bcc, 0400); chmod(cd, 0400); chmod(ncd, 0400);
     chmod(cn, 0444);
     return 0;
@@ -419,30 +450,7 @@ int batt_daemon(cfg_t *c, node_cand *nodes)
     const char *bcc = OC_BATT "/bcc_current";
     if (!file_exists(bcc)) { err("找不到 %s，守护无法工作", bcc); return EX_ERR; }
 
-    /* bcc_current 单位校准：Android 16 新内核按 0.1A/格 解析（写 73=7300mA），
-       旧内核直接按 mA。写测试值后读 votable 反推倍率，保证按 mA 语义写入。 */
-    long bcc_scale = 1;
-    {
-        const char *vs = "/proc/oplus-votable/VOOC_CURR/status";
-        if (file_exists(vs)) {
-            chmod(bcc, 0644);
-            write_long(bcc, 100);
-            chmod(bcc, 0400);
-            buf_t b;
-            if (file_read(vs, &b) == 0) {
-                buf_u8(&b, 0);
-                char *st = (char *)b.data;
-                char *p = strstr(st, "BCC_VOTER");
-                if (p && (p = strstr(p, "v=")))
-                    bcc_scale = atol(p + 2) / 100;
-                buf_free(&b);
-            }
-            if (bcc_scale < 1) bcc_scale = 1;
-            chmod(bcc, 0644);
-            write_long(bcc, 0);
-            chmod(bcc, 0400);
-        }
-    }
+    long bcc_scale = batt_bcc_scale();
     /* 复位判满停充的强制通道，避免上次异常残留 */
     write_str(WD_FORCE_VAL, "0");
     write_str(WD_FORCE_ACT, "0");
