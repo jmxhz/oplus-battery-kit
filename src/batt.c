@@ -379,16 +379,53 @@ static void daemon_log(const char *line)
     int fd = open(p, O_WRONLY | O_CREAT | (sz > 512 * 1024 ? O_TRUNC : O_APPEND), 0644);
     free(p);
     if (fd < 0) return;
-    time_t t = time(NULL);
-    struct tm tmv;
-    localtime_r(&t, &tmv);
-    char hdr[64];
-    strftime(hdr, sizeof(hdr), "[%Y-%m-%d %H:%M:%S] ", &tmv);
+    /* musl 静态库读不到 Android 时区库，直接用系统 date 取本地时间 */
+    char hdr[64] = "[----/--/-- --:--:--] ";
+    FILE *d = popen("date '+%Y-%m-%d %H:%M:%S'", "r");
+    if (d) {
+        char ts[32] = {0};
+        if (fgets(ts, sizeof(ts), d)) {
+            char *nl = strchr(ts, '\n');
+            if (nl) *nl = 0;
+            if (*ts) snprintf(hdr, sizeof(hdr), "[%s] ", ts);
+        }
+        pclose(d);
+    }
     ssize_t ignored = write(fd, hdr, strlen(hdr));
     ignored = write(fd, line, strlen(line));
     ignored = write(fd, "\n", 1);
     (void)ignored;
     close(fd);
+}
+
+/* 守护日志使用设备本地时区（root 进程默认 UTC，读 persist.sys.timezone 修正） */
+static void daemon_set_tz(void)
+{
+    char tz[64] = {0};
+    FILE *f = fopen("/data/property/persist.sys.timezone", "r");
+    if (f) {
+        if (fgets(tz, sizeof(tz), f)) {
+            char *nl = strchr(tz, '\n');
+            if (nl) *nl = 0;
+        }
+        fclose(f);
+    }
+    if (!*tz) {
+        f = popen("getprop persist.sys.timezone", "r");
+        if (f) {
+            if (fgets(tz, sizeof(tz), f)) {
+                char *nl = strchr(tz, '\n');
+                if (nl) *nl = 0;
+            }
+            pclose(f);
+        }
+    }
+    if (*tz) {
+        char *nl = strchr(tz, '\n');
+        if (nl) *nl = 0;
+        setenv("TZ", tz, 1);
+        tzset();
+    }
 }
 
 /* pid 文件：单实例保护，并让 daemon stop 能找到进程 */
@@ -435,6 +472,7 @@ int batt_daemon(cfg_t *c, node_cand *nodes)
     (void)nodes;
     signal(SIGTERM, on_sig);
     signal(SIGINT, on_sig);
+    daemon_set_tz();
 
     int old = batt_daemon_pid();
     if (old) { err("守护已在运行 (pid %d)", old); return EX_ERR; }
